@@ -135,12 +135,7 @@ struct CloseBinaryPropagator {
 		if( is_in_body_component_grid() )
 		{
 			sys[b][c].pos() = jacobipos[b]; //Finally switch to jacobi coordinates.
-			sys[b][c].vel() = jacobimom / sys[b].mass(); // See note below:
-			
-			//Joe Sheldon: I propose a change to ensemble.hpp: save momenta within sys[][].mom()?
-			//In the mean time, we'll divide out the mass of the respective body and store the velocity.
-			//Upon integration, we'll just go ahead and re-multiply. Alternatively we could hypothetically
-			//store momentum in sys[][].vel() but I'd rather not confuse the variables/units.
+			sys[b][c].vel() = jacobimom / sys[b].mass(); // Coord transforms are done in momentum space. Saving velocity
 		}
 
 	}
@@ -210,7 +205,7 @@ struct CloseBinaryPropagator {
 
 	/// Standardized member name to call convert_std_to_jacobi_coord_without_shared()
         GPUAPI void convert_std_to_internal_coord() 
-	{ convert_std_to_jacobi__coord_without_shared(); }
+	{ convert_std_to_jacobi_coord_without_shared(); }
 
 
 	/// Drift step for MVS integrator
