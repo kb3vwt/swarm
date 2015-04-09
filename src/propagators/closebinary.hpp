@@ -81,7 +81,7 @@ struct CloseBinaryPropagator {
 		sqrtGM = sqrt(sys[0].mass());
 		convert_std_to_jacobi_coord_without_shared();
 		__syncthreads();
-		acc_bc = calcForces.acc_planets(ij,b,c);
+		//acc_bc = calcForces.acc_planets(ij,b,c);
                 }
 
 	/// Before exiting, convert back to standard cartesian coordinate system
@@ -207,18 +207,164 @@ struct CloseBinaryPropagator {
         GPUAPI void convert_std_to_internal_coord() 
 	{ convert_std_to_jacobi_coord_without_shared(); }
 
-
-	/// Drift step for MVS integrator
-	GPUAPI void drift_step(const double hby2) 
+	//Keplerian Coordinates Class
+	class kepcoords
 	{
-	     
+		//Constants of Use:
+		double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanAnomaly;
+		double rx,ry,rz,vx,vy,vz,lx,ly,lz;
+		double GravC; // use sqrtGM!
+		
+		public:
+			//Calculate new (?) coordinates
+			void calc_coords(double bodynum)
+			{		
+				//Intermediate Variables:
+				double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
+				double cen_mass[3]; // Center of Mass
+				
+				//Note: This function will differentiate between the mathematics for the 
+				//		second star and the planet. Star B is denoted by b=1. Planets have b>=2.
+				//		The outermost conditional controls for this.
+				
+				if (b==1)
+				{
+					///Star B Math
+				}
+				else
+				{
+					///Planet Math
+					//Calculate Center of Mass:
+					//X:
+					cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
+					//Y:
+					cen_mass[1] = (sys[0].mass()*sys[0][1].pos() + sys[1].mass()*sys[1][1].pos())/(sys[0].mass()+sys[1].mass());
+					//Z:
+					cen_mass[2] = (sys[0].mass()*sys[0][2].pos() + sys[1].mass()*sys[1][2].pos())/(sys[0].mass()+sys[1].mass());
+					
+					//Calculate Reduced Mass ((mA+mB)*mPlanet)/(mA+mB+mPlanet)
+					mu = ((sys[0].mass() + sys[1].mass())*sys[bodynum].mass())/(sys[0].mass()+sys[1].mass()+sys[bodynum].mass());
+					
+					//Calculate Radial Distance from barycenter:
+					rad_dist = sqrt(pow(sys[b][0].pos()-cen_mass[0],2) + pow(sys[b][1].pos()-cen_mass[1],2) + pow(sys[b][2].pos()-cen_mass[2],2))
+					//Calculate Specific Orbital Energy
+					specE = (pow(sys[b][0].vel(),2) + pow(sys[b][1].vel(),2) + pow(sys[b][1].vel(),2))/2 - GravC*(sys[b].mass() + sys[0].mass())/rad_dist;
+					//Calculate L^2
+					L2 = pow(sys[b].mass(),2)*
+						(pow(sys[b][1].pos()*sys[b][2].vel() - sys[b][2].pos()*sys[b][2].vel(),2) +
+						pow(sys[b][2].pos()*sys[b][0].vel() - sys[b][0].pos()*sys[b][2].vel(),2) +
+						pow(sys[b][0].pos()*sys[b][1].vel() - sys[b][1].pos()*sys[b][0].vel(),2));
+					//Calculate eccentricity
+					eccentricity = sqrt(1+(2*specE*L2/pow(mu,2)));
+					//Calculate SemiMajorAxis
+					semiMajorAxis = GravC * (sys[b].mass() + sys[0].mass()) / (2*eccentricity);
+					//Calculate Inclination
+					//vector components
+					rx = sys[b][0].pos() - cen_mass[0];
+					ry = sys[b][1].pos() - cen_mass[1];
+					rz = sys[b][2].pos() - cen_mass[2];
+					vx = sys[b][0].vel();
+					vy = sys[b][0].vel();
+					vz = sys[b][0].vel();
+					lx = sys[b].mass()*(ry*vz - rz*vy);
+					ly = sys[b].mass()*(rz*vx - rx*vz);
+					lz = sys[b].mass()*(rx*vy - ry*vx);
+					lmag = sqrt(lx*lx + ly*ly + lz*lz); //ERROR HANDLE use stderr / cerr if lmag == 0?
+					inclination = acos(lz/lmag); // in radians
+					//Calculate Longitude of the Ascending Node, with reference direction (+1,0,0)
+					longitude = acos(-ly/sqrt(ly*ly+lx+lx));
+					
+				}
+				
+			}
+			
+			///Return Functions:
+			//eccentricity
+			double ecc()
+			{
+				return eccentricity;
+			}
+			//Semi Major Axis
+			double sma()
+			{
+				return semiMajorAxis;
+			}
+			//inclination
+			double inc()
+			{
+				return inclination;
+			}
+			//Longitude of Ascending Node
+			double lon()
+			{
+				return longitude
+			}
+			//Argument of Periapsis
+			double arg()
+			{
+				return argumentP;
+			}
+			//Mean Anomaly
+			double man()
+			{
+				return meanAnomaly;
+			}
+			
 	}
 
 
 	/// Advance system by one time unit
 	GPUAPI void advance()
 	{
-	    
+	    //Note: Using kepcoords class with members .sma(), .ecc(), .inc(), .lon(), .arg(), .man()
+		//		for both star B and the planets. To initialize or compute new keplerian coordinates,
+		//		give member function .calc_coords() a single parameter - its body number (var 'b').
+		//		It has access to global sys class.
+		kepcoords planet_b;
+		kepcoords star_B;
+		
+		//Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
+		//arXiv: 07053223v1
+		
+		///Advance H, Planet Interaction by 0.5 * timestep
+		if (b!=1)
+		{
+			
+		}
+		///Repeat NBin Times:
+		if (b==1)
+		{
+			for(int NStep = 0; NStep < NBin; NStep++)
+			{
+				//Advance H, Star B Interaction by (0.5 * timestep) / NBin
+				
+				//Advance H, Star B Kep by (0.5 * timestep) / NBin
+			}
+		}
+		///Advance H, Jump by 0.5 * timestep
+		
+		///Advance H, Planet Kep by timestep
+		if (b!=1)
+		{
+			
+		}
+		///Advance H, Jump by 0.5 * timestep
+		
+		///Repeat NBin Times:
+		if (b==1)
+		{
+			for(int NStep = 0; NStep < NBin; NStep++)
+			{
+				//Advance H, Star B Kep by (0.5 * timestep) / NBin
+				
+				//Advance H, Star B Interaction by (0.5 * timestep) / NBin
+			}
+		}
+		///Advance H, Planet Interaction by 0.5 * timestep
+		if (b!=1)
+		{
+			
+		}
 	}
 };
 
@@ -228,4 +374,3 @@ struct CloseBinaryPropagator {
 }
 }
 }
-
