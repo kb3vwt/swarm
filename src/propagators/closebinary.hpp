@@ -211,7 +211,7 @@ struct CloseBinaryPropagator {
 	class kepcoords
 	{
 	  //Constants of Use:
-	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanAnomaly;
+	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanMotion;
 	  double rx,ry,rz,vx,vy,vz,lx,ly,lz;
 	  double GravC; // use sqrtGM!
 	  double GM = sqrtGM*sqrtGM;
@@ -290,8 +290,8 @@ struct CloseBinaryPropagator {
 	    if (ecc_z < 0)
 	      argumentP = 2.0*3.14159265358979323846 - argumentP;
 	    
-	    //Calculate Mean Anomaly
-	    meanAnomaly = 0;
+	    //Calculate Mean Motion
+	    meanMotion = sqrt((GravC * (sys[0].mass()+sys[1].mass()+sys[b].mass()))/pow(semiMajorAxis,3));
 	  }
 	  
 	  ///Return Functions:
@@ -313,17 +313,17 @@ struct CloseBinaryPropagator {
 	  //Longitude of Ascending Node
 	  double lon()
 	  {
-	    return longitude
-	      }
+	    return longitude;
+	  }
 	  //Argument of Periapsis
 	  double arg()
 	  {
 	    return argumentP;
 	  }
 	  //Mean Anomaly
-	  double man()
+	  double mm()
 	  {
-	    return meanAnomaly;
+	    return meanMotion;
 	  }
 	  
 	}
@@ -338,6 +338,10 @@ struct CloseBinaryPropagator {
 		//		It has access to global sys class.
 		kepcoords planet_b;
 		kepcoords star_B;
+		
+		//initialize planet_b and star_B:
+		planet_b.init(b);
+		star_B.init(1);
 		
 		//Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
 		//arXiv: 07053223v1
