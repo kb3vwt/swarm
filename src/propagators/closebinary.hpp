@@ -224,18 +224,7 @@ struct CloseBinaryPropagator {
 	    //Intermediate Variables:
 	    double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
 	    double cen_mass[3]; // Center of Mass
-	    
-	    //Note: This function will differentiate between the mathematics for the 
-	    //		second star and the planet. Star B is denoted by b=1. Planets have b>=2.
-	    //		The outermost conditional controls for this.
-	    
-	    //if (b==1)
-	    //   {
-		///Star B Math
-	    //   }
-	    //  else
-	    //   {
-	    ///Planet Math
+	       
 	    //Calculate Center of Mass:
 	    //X:
 	    cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
@@ -353,7 +342,22 @@ struct CloseBinaryPropagator {
 	  //Mean motion is a constant, no writing necessary
 	  
 	}
+
 	//Convert kepcoords BACK into Cartesian
+	  GPUAPI void convert_kep_to_cart(kepcoords kep_body)
+	  {
+	    //Calculate position
+
+	    //Calculate velocity
+
+	    ///Write Values:
+	    sys[b][0].pos() = rx;
+	    sys[b][1].pos() = ry;
+	    sys[b][2].pos() = rz;
+	    sys[b][0].vel() = vx;
+	    sys[b][1].vel() = vy;
+	    sys[b][2].vel() = vz;
+	  }
 
 	// Advance system by one time unit
 	  GPUAPI void advance()
