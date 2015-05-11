@@ -179,8 +179,8 @@ struct CloseBinaryPropagator {
 			CartCoord_planet = sys[b][c].pos() + nuA*CartCoord_A + nuB*CartCoord_B;
 			
 			//calculate Momenta in Cartesian Coords
-			StdMom_A = (1 - nuB) * ((1-mplan/mtot)*sys[0][c].vel()*mA - sum_mom - (sys[1][c].vel()*mB)/(1-nuB));
-			StdMom_B = (sys[1][c].vel()*mB + nuB*StdMom_A)/(1-nuB);
+			StdMom_A = (1.0 - nuB) * ((1.0-mplan/mtot)*sys[0][c].vel()*mA - sum_mom - (sys[1][c].vel()*mB)/(1.0-nuB));
+			StdMom_B = (sys[1][c].vel()*mB + nuB*StdMom_A)/(1.0-nuB);
 			StdMom_planet = sys[b][c].vel()*sys[b].mass() + (sys[b].mass/mtot)*sys[0][c].vel()*mA;
 			
 		}
@@ -210,106 +210,122 @@ struct CloseBinaryPropagator {
 	//Keplerian Coordinates Class
 	class kepcoords
 	{
-		//Constants of Use:
-		double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanAnomaly;
-		double rx,ry,rz,vx,vy,vz,lx,ly,lz;
-		double GravC; // use sqrtGM!
-		
-		public:
-			//Calculate new (?) coordinates
-			void calc_coords(double bodynum)
-			{		
-				//Intermediate Variables:
-				double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
-				double cen_mass[3]; // Center of Mass
-				
-				//Note: This function will differentiate between the mathematics for the 
-				//		second star and the planet. Star B is denoted by b=1. Planets have b>=2.
-				//		The outermost conditional controls for this.
-				
-				if (b==1)
-				{
-					///Star B Math
-				}
-				else
-				{
-					///Planet Math
-					//Calculate Center of Mass:
-					//X:
-					cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
-					//Y:
-					cen_mass[1] = (sys[0].mass()*sys[0][1].pos() + sys[1].mass()*sys[1][1].pos())/(sys[0].mass()+sys[1].mass());
-					//Z:
-					cen_mass[2] = (sys[0].mass()*sys[0][2].pos() + sys[1].mass()*sys[1][2].pos())/(sys[0].mass()+sys[1].mass());
-					
-					//Calculate Reduced Mass ((mA+mB)*mPlanet)/(mA+mB+mPlanet)
-					mu = ((sys[0].mass() + sys[1].mass())*sys[bodynum].mass())/(sys[0].mass()+sys[1].mass()+sys[bodynum].mass());
-					
-					//Calculate Radial Distance from barycenter:
-					rad_dist = sqrt(pow(sys[b][0].pos()-cen_mass[0],2) + pow(sys[b][1].pos()-cen_mass[1],2) + pow(sys[b][2].pos()-cen_mass[2],2))
-					//Calculate Specific Orbital Energy
-					specE = (pow(sys[b][0].vel(),2) + pow(sys[b][1].vel(),2) + pow(sys[b][1].vel(),2))/2 - GravC*(sys[b].mass() + sys[0].mass())/rad_dist;
-					//Calculate L^2
-					L2 = pow(sys[b].mass(),2)*
-						(pow(sys[b][1].pos()*sys[b][2].vel() - sys[b][2].pos()*sys[b][2].vel(),2) +
-						pow(sys[b][2].pos()*sys[b][0].vel() - sys[b][0].pos()*sys[b][2].vel(),2) +
-						pow(sys[b][0].pos()*sys[b][1].vel() - sys[b][1].pos()*sys[b][0].vel(),2));
-					//Calculate eccentricity
-					eccentricity = sqrt(1+(2*specE*L2/pow(mu,2)));
-					//Calculate SemiMajorAxis
-					semiMajorAxis = GravC * (sys[b].mass() + sys[0].mass()) / (2*eccentricity);
-					//Calculate Inclination
-					//vector components
-					rx = sys[b][0].pos() - cen_mass[0];
-					ry = sys[b][1].pos() - cen_mass[1];
-					rz = sys[b][2].pos() - cen_mass[2];
-					vx = sys[b][0].vel();
-					vy = sys[b][0].vel();
-					vz = sys[b][0].vel();
-					lx = sys[b].mass()*(ry*vz - rz*vy);
-					ly = sys[b].mass()*(rz*vx - rx*vz);
-					lz = sys[b].mass()*(rx*vy - ry*vx);
-					lmag = sqrt(lx*lx + ly*ly + lz*lz); //ERROR HANDLE use stderr / cerr if lmag == 0?
-					inclination = acos(lz/lmag); // in radians
-					//Calculate Longitude of the Ascending Node, with reference direction (+1,0,0)
-					longitude = acos(-ly/sqrt(ly*ly+lx+lx));
-					
-				}
-				
-			}
-			
-			///Return Functions:
-			//eccentricity
-			double ecc()
-			{
-				return eccentricity;
-			}
-			//Semi Major Axis
-			double sma()
-			{
-				return semiMajorAxis;
-			}
-			//inclination
-			double inc()
-			{
-				return inclination;
-			}
-			//Longitude of Ascending Node
-			double lon()
-			{
-				return longitude
-			}
-			//Argument of Periapsis
-			double arg()
-			{
-				return argumentP;
-			}
-			//Mean Anomaly
-			double man()
-			{
-				return meanAnomaly;
-			}
-			
+	  //Constants of Use:
+	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanAnomaly;
+	  double rx,ry,rz,vx,vy,vz,lx,ly,lz;
+	  double GravC; // use sqrtGM!
+	  double GM = sqrtGM*sqrtGM;
+	  double ecc_x,ecc_y,ecc_z; // Eccentricity Vector
+	  
+	  public:
+	  //Calculate new (?) coordinates
+	  void init(double bodynum)
+	  {		
+	    //Intermediate Variables:
+	    double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
+	    double cen_mass[3]; // Center of Mass
+	    
+	    //Note: This function will differentiate between the mathematics for the 
+	    //		second star and the planet. Star B is denoted by b=1. Planets have b>=2.
+	    //		The outermost conditional controls for this.
+	    
+	    //if (b==1)
+	    //   {
+		///Star B Math
+	    //   }
+	    //  else
+	    //   {
+	    ///Planet Math
+	    //Calculate Center of Mass:
+	    //X:
+	    cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
+	    //Y:
+	    cen_mass[1] = (sys[0].mass()*sys[0][1].pos() + sys[1].mass()*sys[1][1].pos())/(sys[0].mass()+sys[1].mass());
+	    //Z:
+	    cen_mass[2] = (sys[0].mass()*sys[0][2].pos() + sys[1].mass()*sys[1][2].pos())/(sys[0].mass()+sys[1].mass());
+	    
+	    //Calculate Reduced Mass ((mA+mB)*mPlanet)/(mA+mB+mPlanet)
+	    mu = ((sys[0].mass() + sys[1].mass())*sys[bodynum].mass())/(sys[0].mass()+sys[1].mass()+sys[bodynum].mass());
+	    
+	    //Calculate Radial Distance from barycenter:
+	    rad_dist = sqrt(pow(sys[b][0].pos()-cen_mass[0],2) + pow(sys[b][1].pos()-cen_mass[1],2) + pow(sys[b][2].pos()-cen_mass[2],2));
+	    //Calculate Specific Orbital Energy
+	    specE = (pow(sys[b][0].vel(),2) + pow(sys[b][1].vel(),2) + pow(sys[b][1].vel(),2))/2.0 - GravC*(sys[b].mass() + sys[0].mass())/rad_dist;
+	    //Calculate L^2
+	    L2 = pow(sys[b].mass(),2)*
+	      (pow(sys[b][1].pos()*sys[b][2].vel() - sys[b][2].pos()*sys[b][2].vel(),2) +
+	       pow(sys[b][2].pos()*sys[b][0].vel() - sys[b][0].pos()*sys[b][2].vel(),2) +
+	       pow(sys[b][0].pos()*sys[b][1].vel() - sys[b][1].pos()*sys[b][0].vel(),2));
+	    //Calculate eccentricity
+	    eccentricity = sqrt(1.0+(2.0*specE*L2/pow(mu,2)));
+	    //Calculate SemiMajorAxis
+	    semiMajorAxis = GravC * (sys[b].mass() + sys[0].mass()) / (2.0*eccentricity);
+	    //Calculate Inclination
+	    //vector components
+	    rx = sys[b][0].pos() - cen_mass[0];
+	    ry = sys[b][1].pos() - cen_mass[1];
+	    rz = sys[b][2].pos() - cen_mass[2];
+	    vx = sys[b][0].vel();
+	    vy = sys[b][0].vel();
+	    vz = sys[b][0].vel();
+	    lx = sys[b].mass()*(ry*vz - rz*vy);
+	    ly = sys[b].mass()*(rz*vx - rx*vz);
+	    lz = sys[b].mass()*(rx*vy - ry*vx);
+	    lmag = sqrt(lx*lx + ly*ly + lz*lz); //ERROR HANDLE use stderr / cerr if lmag == 0?
+	    inclination = acos(lz/lmag); // in radians
+	    //Calculate Longitude of the Ascending Node, with reference direction (+1,0,0)
+	    longitude = acos(-ly/sqrt(ly*ly+lx+lx));
+	    //Calculate Argument of Periapsis
+	    //FIRST: Eccentricity Vector Components:
+	    ecc_x = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rx - ((rx*vx+ry*vy+rz*vz)/GM)*vx - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rx;
+	    ecc_y = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*ry - ((rx*vx+ry*vy+rz*vz)/GM)*vy - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*ry;
+	    ecc_z = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rz - ((rx*vx+ry*vy+rz*vz)/GM)*vz - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rz;
+	    
+	    if(inclination == 0)
+	      argumentP = atan2(ecc_y,ecc_x); // If orbit is equitorial
+	    else
+	      argumentP = acos(ecc_x/sqrt(ecc_x*ecc_x+ecc_y*ecc_y+ecc_z*ecc*z)); // For cases where orbit is NOT equitorial. Here we define the ascending node as before (+1,0,0)
+	    
+	    //If clockwise orbit, ecc_z < 0. Handle this case:
+	    if (ecc_z < 0)
+	      argumentP = 2.0*3.14159265358979323846 - argumentP;
+	    
+	    //Calculate Mean Anomaly
+	    meanAnomaly = 0;
+	  }
+	  
+	  ///Return Functions:
+	  //eccentricity
+	  double ecc()
+	  {
+	    return eccentricity;
+	  }
+	  //Semi Major Axis
+	  double sma()
+	  {
+	    return semiMajorAxis;
+	  }
+	  //inclination
+	  double inc()
+	  {
+	    return inclination;
+	  }
+	  //Longitude of Ascending Node
+	  double lon()
+	  {
+	    return longitude
+	      }
+	  //Argument of Periapsis
+	  double arg()
+	  {
+	    return argumentP;
+	  }
+	  //Mean Anomaly
+	  double man()
+	  {
+	    return meanAnomaly;
+	  }
+	  
 	}
 
 
