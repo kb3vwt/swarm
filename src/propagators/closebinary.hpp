@@ -211,7 +211,7 @@ struct CloseBinaryPropagator {
 	class kepcoords
 	{
 	  //Constants of Use:
-	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanMotion;
+	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanMotion,MeanAnomaly;
 	  double rx,ry,rz,vx,vy,vz,lx,ly,lz;
 	  double GravC; // use sqrtGM!
 	  double GM = sqrtGM*sqrtGM;
@@ -294,100 +294,126 @@ struct CloseBinaryPropagator {
 	    meanMotion = sqrt((GravC * (sys[0].mass()+sys[1].mass()+sys[b].mass()))/pow(semiMajorAxis,3));
 	  }
 	  
-	  ///Return Functions:
+	  ///Return & Write Functions:
 	  //eccentricity
 	  double ecc()
 	  {
-	    return eccentricity;
+	      return eccentricity;
 	  }
+	  void w_ecc(double in_ecc)
+	  {
+	    eccentricity = in_ecc;
+	  }
+
 	  //Semi Major Axis
 	  double sma()
 	  {
-	    return semiMajorAxis;
+	      return semiMajorAxis;
 	  }
+	  void w_sma(double in_sma)
+	  {
+	    semiMajorAxis = in_sma;
+	  }
+
 	  //inclination
 	  double inc()
 	  {
-	    return inclination;
+	      return inclination;
 	  }
+	  void w_inc(double in_inc)
+	  {
+	    inclination = in_inc;
+	  }
+
 	  //Longitude of Ascending Node
 	  double lon()
 	  {
-	    return longitude;
+	      return longitude;
 	  }
+	  void w_lon(double in_lon)
+	  {
+	    longitude = in_lon;
+	  }
+	  
 	  //Argument of Periapsis
 	  double arg()
 	  {
 	    return argumentP;
 	  }
-	  //Mean Anomaly
+	  void w_arg(double in_arg)
+	  {
+	    argumentP = in_arg;
+	  }
+
+	  //Mean Motion
 	  double mm()
 	  {
 	    return meanMotion;
 	  }
+	  //Mean motion is a constant, no writing necessary
 	  
 	}
+	//Convert kepcoords BACK into Cartesian
 
-
-	/// Advance system by one time unit
-	GPUAPI void advance()
-	{
+	// Advance system by one time unit
+	  GPUAPI void advance()
+	  {
 	    //Note: Using kepcoords class with members .sma(), .ecc(), .inc(), .lon(), .arg(), .man()
-		//		for both star B and the planets. To initialize or compute new keplerian coordinates,
-		//		give member function .calc_coords() a single parameter - its body number (var 'b').
-		//		It has access to global sys class.
-		kepcoords planet_b;
-		kepcoords star_B;
+	    //		for both star B and the planets. To initialize or compute new keplerian coordinates,
+	    //		give member function .calc_coords() a single parameter - its body number (var 'b').
+	    //		It has access to global sys class.
+	    kepcoords kep_planet_b;
+	    kepcoords kep_star_B;
+	    
+	    //initialize planet_b and star_B:
+	    kep_planet_b.init(b);
+	    kep_star_B.init(1);
+	    
+	    //Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
+	    //arXiv: 07053223v1
+	    
+	    ///Advance H, Planet Interaction by 0.5 * timestep
+	    if (b!=1)
+	      {
 		
-		//initialize planet_b and star_B:
-		planet_b.init(b);
-		star_B.init(1);
+	      }
+	    ///Repeat NBin Times:
+	    if (b==1)
+	      {
+		for(int NStep = 0; NStep < NBin; NStep++)
+		  {
+		    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
+		    
+		    //Advance H, Star B Kep by (0.5 * timestep) / NBin
+		  }
+	      }
+	    ///Advance H, Jump by 0.5 * timestep
+	    
+	    ///Advance H, Planet Kep by timestep
+	    if (b!=1)
+	      {
 		
-		//Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
-		//arXiv: 07053223v1
+	      }
+	    ///Advance H, Jump by 0.5 * timestep
+	    
+	    ///Repeat NBin Times:
+	    if (b==1)
+	      {
+		for(int NStep = 0; NStep < NBin; NStep++)
+		  {
+		    //Advance H, Star B Kep by (0.5 * timestep) / NBin
+		    
+		    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
+		  }
+	      }
+	    ///Advance H, Planet Interaction by 0.5 * timestep
+	    if (b!=1)
+	      {
 		
-		///Advance H, Planet Interaction by 0.5 * timestep
-		if (b!=1)
-		{
-			
-		}
-		///Repeat NBin Times:
-		if (b==1)
-		{
-			for(int NStep = 0; NStep < NBin; NStep++)
-			{
-				//Advance H, Star B Interaction by (0.5 * timestep) / NBin
-				
-				//Advance H, Star B Kep by (0.5 * timestep) / NBin
-			}
-		}
-		///Advance H, Jump by 0.5 * timestep
-		
-		///Advance H, Planet Kep by timestep
-		if (b!=1)
-		{
-			
-		}
-		///Advance H, Jump by 0.5 * timestep
-		
-		///Repeat NBin Times:
-		if (b==1)
-		{
-			for(int NStep = 0; NStep < NBin; NStep++)
-			{
-				//Advance H, Star B Kep by (0.5 * timestep) / NBin
-				
-				//Advance H, Star B Interaction by (0.5 * timestep) / NBin
-			}
-		}
-		///Advance H, Planet Interaction by 0.5 * timestep
-		if (b!=1)
-		{
-			
-		}
-	}
+	      }
+	  }
 };
-
+  
 
 
 
