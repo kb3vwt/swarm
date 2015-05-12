@@ -47,7 +47,6 @@ struct CloseBinaryPropagator {
 
 	double sqrtGM;
 	double max_timestep;
-
 	double acc_bc;
 
         //! Constructor for CloseBinaryPropagator
@@ -81,7 +80,7 @@ struct CloseBinaryPropagator {
 		sqrtGM = sqrt(sys[0].mass());
 		convert_std_to_jacobi_coord_without_shared();
 		__syncthreads();
-		//acc_bc = calcForces.acc_planets(ij,b,c);
+		acc_bc = calcForces.acc_planets(ij,b,c);
                 }
 
 	/// Before exiting, convert back to standard cartesian coordinate system
@@ -127,7 +126,7 @@ struct CloseBinaryPropagator {
 			jacobimom[0] = momA + momB + sum_mom;
 			jacobimom[1] = momB - nuB * (momA - momB);
 			jacobimom[b] = sys[b].mass() * sys[b][c].vel() - sys[b].mass()*(momA + momB + sum_mom)/mtot;
-			
+	
 			}
 		}
 		__syncthreads();
@@ -137,7 +136,6 @@ struct CloseBinaryPropagator {
 			sys[b][c].pos() = jacobipos[b]; //Finally switch to jacobi coordinates.
 			sys[b][c].vel() = jacobimom / sys[b].mass(); // Coord transforms are done in momentum space. Saving velocity
 		}
-
 	}
 
 	///Convert back to Cartesian, from Jacobi
@@ -379,8 +377,10 @@ struct CloseBinaryPropagator {
 	    ///Advance H, Planet Interaction by 0.5 * timestep
 	    if (b!=1)
 	      {
-		
+		acc_bc = calcForces.acc_planets(ij,b,c);
 	      }
+	    
+	    __syncthreads();
 	    ///Repeat NBin Times:
 	    if (b==1)
 	      {
