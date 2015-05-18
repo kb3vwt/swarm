@@ -205,149 +205,153 @@ struct CloseBinaryPropagator {
         GPUAPI void convert_std_to_internal_coord() 
 	{ convert_std_to_jacobi_coord_without_shared(); }
 
-	//Keplerian Coordinates Class
-	class kepcoords
-	{
-	  //Constants of Use:
-	  double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanMotion,MeanAnomaly;
-	  double rx,ry,rz,vx,vy,vz,lx,ly,lz;
-	  double GravC; // use sqrtGM!
-	  double GM = sqrtGM*sqrtGM;
-	  double ecc_x,ecc_y,ecc_z; // Eccentricity Vector
-	  
-	  public:
-	  //Calculate new (?) coordinates
-	  void init(double bodynum)
-	  {		
-	    //Intermediate Variables:
-	    double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
-	    double cen_mass[3]; // Center of Mass
-	       
-	    //Calculate Center of Mass:
-	    //X:
-	    cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
-	    //Y:
-	    cen_mass[1] = (sys[0].mass()*sys[0][1].pos() + sys[1].mass()*sys[1][1].pos())/(sys[0].mass()+sys[1].mass());
-	    //Z:
-	    cen_mass[2] = (sys[0].mass()*sys[0][2].pos() + sys[1].mass()*sys[1][2].pos())/(sys[0].mass()+sys[1].mass());
-	    
-	    //Calculate Reduced Mass ((mA+mB)*mPlanet)/(mA+mB+mPlanet)
-	    mu = ((sys[0].mass() + sys[1].mass())*sys[bodynum].mass())/(sys[0].mass()+sys[1].mass()+sys[bodynum].mass());
-	    
-	    //Calculate Radial Distance from barycenter:
-	    rad_dist = sqrt(pow(sys[b][0].pos()-cen_mass[0],2) + pow(sys[b][1].pos()-cen_mass[1],2) + pow(sys[b][2].pos()-cen_mass[2],2));
-	    //Calculate Specific Orbital Energy
-	    specE = (pow(sys[b][0].vel(),2) + pow(sys[b][1].vel(),2) + pow(sys[b][1].vel(),2))/2.0 - GravC*(sys[b].mass() + sys[0].mass())/rad_dist;
-	    //Calculate L^2
-	    L2 = pow(sys[b].mass(),2)*
-	      (pow(sys[b][1].pos()*sys[b][2].vel() - sys[b][2].pos()*sys[b][2].vel(),2) +
-	       pow(sys[b][2].pos()*sys[b][0].vel() - sys[b][0].pos()*sys[b][2].vel(),2) +
-	       pow(sys[b][0].pos()*sys[b][1].vel() - sys[b][1].pos()*sys[b][0].vel(),2));
-	    //Calculate eccentricity
-	    eccentricity = sqrt(1.0+(2.0*specE*L2/pow(mu,2)));
-	    //Calculate SemiMajorAxis
-	    semiMajorAxis = GravC * (sys[b].mass() + sys[0].mass()) / (2.0*eccentricity);
-	    //Calculate Inclination
-	    //vector components
-	    rx = sys[b][0].pos() - cen_mass[0];
-	    ry = sys[b][1].pos() - cen_mass[1];
-	    rz = sys[b][2].pos() - cen_mass[2];
-	    vx = sys[b][0].vel();
-	    vy = sys[b][0].vel();
-	    vz = sys[b][0].vel();
-	    lx = sys[b].mass()*(ry*vz - rz*vy);
-	    ly = sys[b].mass()*(rz*vx - rx*vz);
-	    lz = sys[b].mass()*(rx*vy - ry*vx);
-	    lmag = sqrt(lx*lx + ly*ly + lz*lz); //ERROR HANDLE use stderr / cerr if lmag == 0?
-	    inclination = acos(lz/lmag); // in radians
-	    //Calculate Longitude of the Ascending Node, with reference direction (+1,0,0)
-	    longitude = acos(-ly/sqrt(ly*ly+lx+lx));
-	    //Calculate Argument of Periapsis
-	    //FIRST: Eccentricity Vector Components:
-	    ecc_x = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rx - ((rx*vx+ry*vy+rz*vz)/GM)*vx - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rx;
-	    ecc_y = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*ry - ((rx*vx+ry*vy+rz*vz)/GM)*vy - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*ry;
-	    ecc_z = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rz - ((rx*vx+ry*vy+rz*vz)/GM)*vz - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rz;
-	    
-	    if(inclination == 0)
-	      argumentP = atan2(ecc_y,ecc_x); // If orbit is equitorial
-	    else
-	      argumentP = acos(ecc_x/sqrt(ecc_x*ecc_x+ecc_y*ecc_y+ecc_z*ecc*z)); // For cases where orbit is NOT equitorial. Here we define the ascending node as before (+1,0,0)
-	    
-	    //If clockwise orbit, ecc_z < 0. Handle this case:
-	    if (ecc_z < 0)
-	      argumentP = 2.0*3.14159265358979323846 - argumentP;
-	    
-	    //Calculate Mean Motion
-	    meanMotion = sqrt((GravC * (sys[0].mass()+sys[1].mass()+sys[b].mass()))/pow(semiMajorAxis,3));
-	  }
-	  
-	  ///Return & Write Functions:
-	  //eccentricity
-	  double ecc()
-	  {
-	      return eccentricity;
-	  }
-	  void w_ecc(double in_ecc)
-	  {
-	    eccentricity = in_ecc;
-	  }
+  //Keplerian Coordinates Class 
+  //NOT PARALLELIZED!! FUTURE: FIGURE OUT HOW TO
+  class kepcoords
+  {
+    //Constants of Use:
+    double eccentricity,semiMajorAxis, inclination,longitude,argumentP,meanMotion,MeanAnomaly;
+    double rx,ry,rz,vx,vy,vz,lx,ly,lz;
+    double GravC; // use sqrtGM!
+    double GM = sqrtGM*sqrtGM;
+    double ecc_x,ecc_y,ecc_z; // Eccentricity Vector
+    
+  public:
+    //Calculate new (?) coordinates
+    void init(double bodynum)
+    {		
+      //Intermediate Variables:
+      double specE,rad_dist,L2,mu; //Specific Energy, radial distance, (ang momentum)^2, reduced mass
+      double cen_mass[3]; // Center of Mass
+      
+      //Calculate Center of Mass:
+      //X:
+      cen_mass[0] = (sys[0].mass()*sys[0][0].pos() + sys[1].mass()*sys[1][0].pos())/(sys[0].mass()+sys[1].mass());
+      //Y:
+      cen_mass[1] = (sys[0].mass()*sys[0][1].pos() + sys[1].mass()*sys[1][1].pos())/(sys[0].mass()+sys[1].mass());
+      //Z:
+      cen_mass[2] = (sys[0].mass()*sys[0][2].pos() + sys[1].mass()*sys[1][2].pos())/(sys[0].mass()+sys[1].mass());
+      
+      //Calculate Reduced Mass ((mA+mB)*mPlanet)/(mA+mB+mPlanet)
+      mu = ((sys[0].mass() + sys[1].mass())*sys[bodynum].mass())/(sys[0].mass()+sys[1].mass()+sys[bodynum].mass());
+      
+      //Calculate Radial Distance from barycenter:
+      rad_dist = sqrt(pow(sys[b][0].pos()-cen_mass[0],2) + pow(sys[b][1].pos()-cen_mass[1],2) + pow(sys[b][2].pos()-cen_mass[2],2));
+      //Calculate Specific Orbital Energy
+      specE = (pow(sys[b][0].vel(),2) + pow(sys[b][1].vel(),2) + pow(sys[b][1].vel(),2))/2.0 - GravC*(sys[b].mass() + sys[0].mass())/rad_dist;
+      //Calculate L^2
+      L2 = pow(sys[b].mass(),2)*
+	(pow(sys[b][1].pos()*sys[b][2].vel() - sys[b][2].pos()*sys[b][2].vel(),2) +
+	 pow(sys[b][2].pos()*sys[b][0].vel() - sys[b][0].pos()*sys[b][2].vel(),2) +
+	 pow(sys[b][0].pos()*sys[b][1].vel() - sys[b][1].pos()*sys[b][0].vel(),2));
+      //Calculate eccentricity
+      eccentricity = sqrt(1.0+(2.0*specE*L2/pow(mu,2)));
+      //Calculate SemiMajorAxis
+      semiMajorAxis = GravC * (sys[b].mass() + sys[0].mass()) / (2.0*eccentricity);
+      //Calculate Inclination
+      //vector components
+      rx = sys[b][0].pos() - cen_mass[0];
+      ry = sys[b][1].pos() - cen_mass[1];
+      rz = sys[b][2].pos() - cen_mass[2];
+      vx = sys[b][0].vel();
+      vy = sys[b][0].vel();
+      vz = sys[b][0].vel();
+      lx = sys[b].mass()*(ry*vz - rz*vy);
+      ly = sys[b].mass()*(rz*vx - rx*vz);
+      lz = sys[b].mass()*(rx*vy - ry*vx);
+      lmag = sqrt(lx*lx + ly*ly + lz*lz); //ERROR HANDLE use stderr / cerr if lmag == 0?
+      inclination = acos(lz/lmag); // in radians
+      //Calculate Longitude of the Ascending Node, with reference direction (+1,0,0)
+      longitude = acos(-ly/sqrt(ly*ly+lx+lx));
+      //Calculate Argument of Periapsis
+      //FIRST: Eccentricity Vector Components:
+      ecc_x = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rx - ((rx*vx+ry*vy+rz*vz)/GM)*vx - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rx;
+      ecc_y = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*ry - ((rx*vx+ry*vy+rz*vz)/GM)*vy - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*ry;
+      ecc_z = (sqrt(vx*vx+vy*vy+vz*vz)/GM)*rz - ((rx*vx+ry*vy+rz*vz)/GM)*vz - (1.0/sqrt(rx*rx+ry*ry+rz*rz))*rz;
+      
+      if(inclination == 0)
+	argumentP = atan2(ecc_y,ecc_x); // If orbit is equitorial
+      else
+	argumentP = acos(ecc_x/sqrt(ecc_x*ecc_x+ecc_y*ecc_y+ecc_z*ecc*z)); // For cases where orbit is NOT equitorial. Here we define the ascending node as before (+1,0,0)
+      
+      //If clockwise orbit, ecc_z < 0. Handle this case:
+      if (ecc_z < 0)
+	argumentP = 2.0*3.14159265358979323846 - argumentP;
+      
+      //Calculate Mean Motion
+      meanMotion = sqrt((GravC * (sys[0].mass()+sys[1].mass()+sys[b].mass()))/pow(semiMajorAxis,3));
+    }
+    
+    ///Return & Write Functions:
+    //eccentricity
+    double ecc()
+    {
+      return eccentricity;
+    }
+    void w_ecc(double in_ecc)
+    {
+      eccentricity = in_ecc;
+    }
+    
+    //Semi Major Axis
+    double sma()
+    {
+      return semiMajorAxis;
+    }
+    void w_sma(double in_sma)
+    {
+      semiMajorAxis = in_sma;
+    }
+    
+    //inclination
+    double inc()
+    {
+      return inclination;
+    }
+    void w_inc(double in_inc)
+    {
+      inclination = in_inc;
+    }
+    
+    //Longitude of Ascending Node
+    double lon()
+    {
+      return longitude;
+    }
+    void w_lon(double in_lon)
+    {
+      longitude = in_lon;
+    }
+    
+    //Argument of Periapsis
+    double arg()
+    {
+      return argumentP;
+    }
+    void w_arg(double in_arg)
+    {
+      argumentP = in_arg;
+    }
+    
+    //Mean Motion
+    double mm()
+    {
+      return meanMotion;
+    }
+    double w_mm(double in_mm)
+    {
+      meanMotion = in_mm;
+    }
+    
+  }
 
-	  //Semi Major Axis
-	  double sma()
-	  {
-	      return semiMajorAxis;
-	  }
-	  void w_sma(double in_sma)
-	  {
-	    semiMajorAxis = in_sma;
-	  }
-
-	  //inclination
-	  double inc()
-	  {
-	      return inclination;
-	  }
-	  void w_inc(double in_inc)
-	  {
-	    inclination = in_inc;
-	  }
-
-	  //Longitude of Ascending Node
-	  double lon()
-	  {
-	      return longitude;
-	  }
-	  void w_lon(double in_lon)
-	  {
-	    longitude = in_lon;
-	  }
-	  
-	  //Argument of Periapsis
-	  double arg()
-	  {
-	    return argumentP;
-	  }
-	  void w_arg(double in_arg)
-	  {
-	    argumentP = in_arg;
-	  }
-
-	  //Mean Motion
-	  double mm()
-	  {
-	    return meanMotion;
-	  }
-	  //Mean motion is a constant, no writing necessary
-	  
-	}
-
-	//Convert kepcoords BACK into Cartesian
-	  GPUAPI void convert_kep_to_cart(kepcoords kep_body)
+  //Convert kepcoords BACK into Cartesian
+    GPUAPI void convert_kep_to_cart(kepcoords kep_body)
 	  {
 	    //Calculate position
-
+	    
 	    //Calculate velocity
-
+	    
 	    ///Write Values:
 	    sys[b][0].pos() = rx;
 	    sys[b][1].pos() = ry;
@@ -356,71 +360,74 @@ struct CloseBinaryPropagator {
 	    sys[b][1].vel() = vy;
 	    sys[b][2].vel() = vz;
 	  }
-
-	// Advance system by one time unit
-	  GPUAPI void advance()
+  
+  // Advance system by one time unit
+  GPUAPI void advance()
+  {
+    //Note: Using kepcoords class with members .sma(), .ecc(), .inc(), .lon(), .arg(), .man()
+    //	    for both star B and the planets. To initialize or compute new keplerian coordinates,
+    //	    give member function .calc_coords() a single parameter - its body number (var 'b').
+    //	    It has access to global sys class.
+    kepcoords kep_planet_b;
+    kepcoords kep_star_B;
+    
+    /*
+    Initialize planet_b and star_B when you need to get their latest coordinates:
+      kep_planet_b.init(b);
+      kep_star_B.init(1);
+    */
+    
+    //Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
+    //arXiv: 07053223v1
+    
+    ///Advance H, Planet Interaction by 0.5 * timestep
+    if (b!=1)
+      {
+	acc_bc = calcForces.acc_planets(ij,b,c);
+	
+      }
+    
+    __syncthreads();
+    ///Repeat NBin Times:
+    if (b==1)
+      {
+	for(int NStep = 0; NStep < NBin; NStep++)
 	  {
-	    //Note: Using kepcoords class with members .sma(), .ecc(), .inc(), .lon(), .arg(), .man()
-	    //		for both star B and the planets. To initialize or compute new keplerian coordinates,
-	    //		give member function .calc_coords() a single parameter - its body number (var 'b').
-	    //		It has access to global sys class.
-	    kepcoords kep_planet_b;
-	    kepcoords kep_star_B;
+	    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
 	    
-	    //initialize planet_b and star_B:
-	    kep_planet_b.init(b);
-	    kep_star_B.init(1);
-	    
-	    //Steps from John Chamber's Close Binary Propagator outlined in "N-Body Integrators for Planets in Binary Star Systems",
-	    //arXiv: 07053223v1
-	    
-	    ///Advance H, Planet Interaction by 0.5 * timestep
-	    if (b!=1)
-	      {
-		acc_bc = calcForces.acc_planets(ij,b,c);
-	      }
-	    
-	    __syncthreads();
-	    ///Repeat NBin Times:
-	    if (b==1)
-	      {
-		for(int NStep = 0; NStep < NBin; NStep++)
-		  {
-		    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
-		    
-		    //Advance H, Star B Kep by (0.5 * timestep) / NBin
-		  }
-	      }
-	    ///Advance H, Jump by 0.5 * timestep
-	    
-	    ///Advance H, Planet Kep by timestep
-	    if (b!=1)
-	      {
-		
-	      }
-	    ///Advance H, Jump by 0.5 * timestep
-	    
-	    ///Repeat NBin Times:
-	    if (b==1)
-	      {
-		for(int NStep = 0; NStep < NBin; NStep++)
-		  {
-		    //Advance H, Star B Kep by (0.5 * timestep) / NBin
-		    
-		    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
-		  }
-	      }
-	    ///Advance H, Planet Interaction by 0.5 * timestep
-	    if (b!=1)
-	      {
-		
-	      }
+	    //Advance H, Star B Kep by (0.5 * timestep) / NBin
 	  }
+      }
+    ///Advance H, Jump by 0.5 * timestep
+    
+    ///Advance H, Planet Kep by timestep
+    if (b!=1)
+      {
+	
+      }
+    ///Advance H, Jump by 0.5 * timestep
+    
+    ///Repeat NBin Times:
+    if (b==1)
+      {
+	for(int NStep = 0; NStep < NBin; NStep++)
+	  {
+	    //Advance H, Star B Kep by (0.5 * timestep) / NBin
+	    
+	    //Advance H, Star B Interaction by (0.5 * timestep) / NBin
+	  }
+      }
+    ///Advance H, Planet Interaction by 0.5 * timestep
+    if (b!=1)
+      {
+	
+      }
+  }
 };
   
-
-
-
+  
+  
+  
 }
 }
 }
